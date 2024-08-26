@@ -1,4 +1,4 @@
-package gocommont
+package gocommon
 
 import (
 	"context"
