@@ -2,7 +2,10 @@ package gocommon
 
 import (
 	"context"
+	"go.opentelemetry.io/otel/baggage"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -32,11 +35,11 @@ type Context interface {
 	HeaderKeyMap() (ret map[string]string)
 
 	// tracing method
-	//StartSpanFromContext(spanName string, opts ...oteltrace.SpanStartOption) oteltrace.Span
-	//GetSpan() oteltrace.Span
-	//SetSpan(span oteltrace.Span)
-	//GetBaggage() baggage.Baggage
-	//SetBaggage(baggage baggage.Baggage)
+	StartSpanFromContext(spanName string, opts ...oteltrace.SpanStartOption) oteltrace.Span
+	GetSpan() oteltrace.Span
+	SetSpan(span oteltrace.Span)
+	GetBaggage() baggage.Baggage
+	SetBaggage(baggage baggage.Baggage)
 
 	// header key transformation
 	SetShortenKey(key string, value interface{})
@@ -168,9 +171,9 @@ func (c *MapContext) MapString() (ret map[string]string) {
 		return true
 	})
 
-	//if sp := oteltrace.SpanFromContext(c.Context); sp != nil && sp.SpanContext().TraceID().IsValid() {
-	//	ret[LogKeyTraceID] = sp.SpanContext().TraceID().String()
-	//}
+	if sp := oteltrace.SpanFromContext(c.Context); sp != nil && sp.SpanContext().TraceID().IsValid() {
+		ret[LogKeyTraceID] = sp.SpanContext().TraceID().String()
+	}
 
 	return
 }
@@ -218,34 +221,34 @@ func (c *MapContext) HeaderKeyMap() (ret map[string]string) {
 		}
 	}
 
-	//if sp := oteltrace.SpanFromContext(c.Context); sp != nil && sp.SpanContext().TraceID().IsValid() {
-	//	ret[LogKeyTraceID] = sp.SpanContext().TraceID().String()
-	//}
-	//
-	//switch role := c.Get(LogKeyUserRole).(type) {
-	//case string:
-	//	ret[HTTPHeaderUserRole] = role
-	//case []string:
-	//	ret[HTTPHeaderUserRole] = strings.Join(role, ",")
-	//}
+	if sp := oteltrace.SpanFromContext(c.Context); sp != nil && sp.SpanContext().TraceID().IsValid() {
+		ret[LogKeyTraceID] = sp.SpanContext().TraceID().String()
+	}
+
+	switch role := c.Get(LogKeyUserRole).(type) {
+	case string:
+		ret[HTTPHeaderUserRole] = role
+	case []string:
+		ret[HTTPHeaderUserRole] = strings.Join(role, ",")
+	}
 	return
 }
 
 // SetShortenKey sets Context with Header Key, Store in Context with LogKey Key
 func (c *MapContext) SetShortenKey(headerField string, headerValue interface{}) {
-	//if sk, ok := hKMap[headerField]; ok {
-	//	c.Set(sk, headerValue)
-	//}
+	if sk, ok := hKMap[headerField]; ok {
+		c.Set(sk, headerValue)
+	}
 }
 
 // GetCID return the CID, if not, generate one
 func (c *MapContext) GetCID() (string, error) {
-	//cid, ok := c.GetString(LogKeyCID)
-	//if !ok {
-	//	cid = strconv.FormatInt(time.Now().UnixNano(), 10)
-	//	c.Set(LogKeyCID, cid)
-	//}
-	return "", nil
+	cid, ok := c.GetString(LogKeyCID)
+	if !ok {
+		cid = strconv.FormatInt(time.Now().UnixNano(), 10)
+		c.Set(LogKeyCID, cid)
+	}
+	return cid, nil
 }
 
 func (c *MapContext) Err() error {
